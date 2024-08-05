@@ -90,9 +90,9 @@ class ComfyApiWrapper:
             while True:
                 # out = ws.recv()
                 out = await websocket.recv()
-                yield out
                 if isinstance(out, str):
                     message = json.loads(out)
+                    yield message
                     if message["type"] == "crystools.monitor":
                         continue
                     _log.debug(message)
