@@ -70,26 +70,20 @@ class ComfyApiWrapper:
                 f"Request failed with status code {resp.status_code}: {resp.reason}"
             )
 
-    async def queue_prompt_and_wait(
-        self, prompt: dict, callback_progress: Callable | None = None
-    ) -> str:
+    async def wait_prompt(
+        self, prompt_id: str, client_id: str, callback_progress: Callable | None = None
+    ):
         """
-        Queues a prompt for execution and waits for the result.
+        Wait for a prompt for execution.
 
         Args:
-            prompt (dict): The prompt to be executed.
+            prompt_id (dict): The prompt to wait.
+            client_id (str): The client ID for the prompt.
             callback_progress (function, optional): A callback function that takes a single argument (the message received from the WebSocket) and is called whenever a new message is received. This function can be used to monitor the progress of the prompt execution. Defaults to None.
-
-        Returns:
-            str: The prompt ID.
 
         Raises:
             Exception: If an execution error occurs.
         """
-        client_id = str(uuid.uuid4())
-        resp = self.queue_prompt(prompt, client_id)
-        _log.debug(resp)
-        prompt_id = resp["prompt_id"]
         _log.info(f"Connecting to {self.ws_url.format(client_id).split('@')[-1]}")
         async with websockets.connect(uri=self.ws_url.format(client_id)) as websocket:
             while True:
@@ -114,6 +108,29 @@ class ComfyApiWrapper:
                         data = message["data"]
                         if data["node"] is None and data["prompt_id"] == prompt_id:
                             return prompt_id
+
+    async def queue_prompt_and_wait(
+        self, prompt: dict, callback_progress: Callable | None = None
+    ) -> str:
+        """
+        Queues a prompt for execution and waits for the result.
+
+        Args:
+            prompt (dict): The prompt to be executed.
+            callback_progress (function, optional): A callback function that takes a single argument (the message received from the WebSocket) and is called whenever a new message is received. This function can be used to monitor the progress of the prompt execution. Defaults to None.
+
+        Returns:
+            str: The prompt ID.
+
+        Raises:
+            Exception: If an execution error occurs.
+        """
+        client_id = str(uuid.uuid4())
+        resp = self.queue_prompt(prompt, client_id)
+        _log.debug(resp)
+        prompt_id = resp["prompt_id"]
+        await self.wait_prompt(prompt_id, client_id, callback_progress)
+        return prompt_id
 
     def queue_and_wait_images(
         self,
