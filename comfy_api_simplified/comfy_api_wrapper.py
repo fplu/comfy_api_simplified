@@ -70,16 +70,17 @@ class ComfyApiWrapper:
                 f"Request failed with status code {resp.status_code}: {resp.reason}"
             )
 
-    async def wait_prompt(
-        self, prompt_id: str, client_id: str, callback_progress: Callable | None = None
-    ):
+    async def wait_prompt(self, prompt_id: str, client_id: str):
+        async for _ in self.wait_prompt_generator(prompt_id, client_id):
+            pass
+
+    async def wait_prompt_generator(self, prompt_id: str, client_id: str):
         """
         Wait for a prompt for execution.
 
         Args:
             prompt_id (dict): The prompt to wait.
             client_id (str): The client ID for the prompt.
-            callback_progress (function, optional): A callback function that takes a single argument (the message received from the WebSocket) and is called whenever a new message is received. This function can be used to monitor the progress of the prompt execution. Defaults to None.
 
         Raises:
             Exception: If an execution error occurs.
@@ -89,8 +90,7 @@ class ComfyApiWrapper:
             while True:
                 # out = ws.recv()
                 out = await websocket.recv()
-                if callback_progress:
-                    callback_progress(out)
+                yield out
                 if isinstance(out, str):
                     message = json.loads(out)
                     if message["type"] == "crystools.monitor":
@@ -103,21 +103,18 @@ class ComfyApiWrapper:
                     if message["type"] == "status":
                         data = message["data"]
                         if data["status"]["exec_info"]["queue_remaining"] == 0:
-                            return prompt_id
+                            return
                     if message["type"] == "executing":
                         data = message["data"]
                         if data["node"] is None and data["prompt_id"] == prompt_id:
-                            return prompt_id
+                            return
 
-    async def queue_prompt_and_wait(
-        self, prompt: dict, callback_progress: Callable | None = None
-    ) -> str:
+    async def queue_prompt_and_wait(self, prompt: dict) -> str:
         """
         Queues a prompt for execution and waits for the result.
 
         Args:
             prompt (dict): The prompt to be executed.
-            callback_progress (function, optional): A callback function that takes a single argument (the message received from the WebSocket) and is called whenever a new message is received. This function can be used to monitor the progress of the prompt execution. Defaults to None.
 
         Returns:
             str: The prompt ID.
@@ -129,14 +126,11 @@ class ComfyApiWrapper:
         resp = self.queue_prompt(prompt, client_id)
         _log.debug(resp)
         prompt_id = resp["prompt_id"]
-        await self.wait_prompt(prompt_id, client_id, callback_progress)
+        await self.wait_prompt(prompt_id, client_id)
         return prompt_id
 
     def queue_and_wait_images(
-        self,
-        prompt: ComfyWorkflowWrapper,
-        output_node_title: str,
-        callback_progress: Callable | None = None,
+        self, prompt: ComfyWorkflowWrapper, output_node_title: str
     ) -> dict:
         """
         Queues a prompt with a ComfyWorkflowWrapper object and waits for the images to be generated.
@@ -144,7 +138,6 @@ class ComfyApiWrapper:
         Args:
             prompt (ComfyWorkflowWrapper): The ComfyWorkflowWrapper object representing the prompt.
             output_node_title (str): The title of the output node.
-            callback_progress (function, optional): A callback function that takes a single argument (the message received from the WebSocket) and is called whenever a new message is received. This function can be used to monitor the progress of the prompt execution. Defaults to None.
 
         Returns:
             dict: A dictionary mapping image filenames to their content.
@@ -154,9 +147,7 @@ class ComfyApiWrapper:
         """
 
         loop = asyncio.get_event_loop()
-        prompt_id = loop.run_until_complete(
-            self.queue_prompt_and_wait(prompt, callback_progress)
-        )
+        prompt_id = loop.run_until_complete(self.queue_prompt_and_wait(prompt))
         history = self.get_history(prompt_id)
         image_node_id = prompt.get_node_id(output_node_title)
         images = history[prompt_id]["outputs"][image_node_id]["images"]
