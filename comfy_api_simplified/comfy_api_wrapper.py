@@ -8,6 +8,7 @@ from requests.auth import HTTPBasicAuth
 from requests.compat import urljoin, urlencode
 from comfy_api_simplified.comfy_workflow_wrapper import ComfyWorkflowWrapper
 import os
+import io
 from typing import Callable
 
 _log = logging.getLogger(__name__)
@@ -246,7 +247,10 @@ class ComfyApiWrapper:
             )
 
     def upload_image(
-        self, filename: str, subfolder: str = "default_upload_folder"
+        self,
+        filename: str,
+        subfolder: str = "default_upload_folder",
+        file_bytes: bytes | None = None,
     ) -> dict:
         """
         Uploads an image to the Comfy API server.
@@ -254,6 +258,7 @@ class ComfyApiWrapper:
         Args:
             filename (str): The filename of the image.
             subfolder (str): The subfolder to upload the image to. Defaults to "default_upload_folder".
+            file_bytes (bytes): A byte-like object to be sent.
 
         Returns:
             dict: The response JSON object.
@@ -261,10 +266,14 @@ class ComfyApiWrapper:
         Raises:
             Exception: If the request fails with a non-200 status code.
         """
+        if file_bytes is None:
+            with open(filename, "rb") as f:
+                file_bytes = f.read()
+
         url = urljoin(self.url, "/upload/image")
         serv_file = os.path.basename(filename)
         data = {"subfolder": subfolder}
-        files = {"image": (serv_file, open(filename, "rb"))}
+        files = {"image": (serv_file, file_bytes)}
         _log.info(f"Posting {filename} to {url} with data {data}")
         resp = requests.post(url, files=files, data=data, auth=self.auth)
         _log.debug(f"{resp.status_code}: {resp.reason}, {resp.text}")
