@@ -8,6 +8,7 @@ from requests.auth import HTTPBasicAuth
 from requests.compat import urljoin, urlencode
 from comfy_api_simplified.comfy_workflow_wrapper import ComfyWorkflowWrapper
 import os
+from typing import Callable
 
 _log = logging.getLogger(__name__)
 
@@ -68,12 +69,15 @@ class ComfyApiWrapper:
                 f"Request failed with status code {resp.status_code}: {resp.reason}"
             )
 
-    async def queue_prompt_and_wait(self, prompt: dict) -> str:
+    async def queue_prompt_and_wait(
+        self, prompt: dict, callback_progress: Callable | None = None
+    ) -> str:
         """
         Queues a prompt for execution and waits for the result.
 
         Args:
             prompt (dict): The prompt to be executed.
+            callback_progress (function, optional): A callback function that takes a single argument (the message received from the WebSocket) and is called whenever a new message is received. This function can be used to monitor the progress of the prompt execution. Defaults to None.
 
         Returns:
             str: The prompt ID.
@@ -90,6 +94,8 @@ class ComfyApiWrapper:
             while True:
                 # out = ws.recv()
                 out = await websocket.recv()
+                if callback_progress:
+                    callback_progress(out)
                 if isinstance(out, str):
                     message = json.loads(out)
                     if message["type"] == "crystools.monitor":
@@ -109,7 +115,10 @@ class ComfyApiWrapper:
                             return prompt_id
 
     def queue_and_wait_images(
-        self, prompt: ComfyWorkflowWrapper, output_node_title: str
+        self,
+        prompt: ComfyWorkflowWrapper,
+        output_node_title: str,
+        callback_progress: Callable | None = None,
     ) -> dict:
         """
         Queues a prompt with a ComfyWorkflowWrapper object and waits for the images to be generated.
@@ -117,6 +126,7 @@ class ComfyApiWrapper:
         Args:
             prompt (ComfyWorkflowWrapper): The ComfyWorkflowWrapper object representing the prompt.
             output_node_title (str): The title of the output node.
+            callback_progress (function, optional): A callback function that takes a single argument (the message received from the WebSocket) and is called whenever a new message is received. This function can be used to monitor the progress of the prompt execution. Defaults to None.
 
         Returns:
             dict: A dictionary mapping image filenames to their content.
@@ -126,7 +136,9 @@ class ComfyApiWrapper:
         """
 
         loop = asyncio.get_event_loop()
-        prompt_id = loop.run_until_complete(self.queue_prompt_and_wait(prompt))
+        prompt_id = loop.run_until_complete(
+            self.queue_prompt_and_wait(prompt, callback_progress)
+        )
         history = self.get_history(prompt_id)
         image_node_id = prompt.get_node_id(output_node_title)
         images = history[prompt_id]["outputs"][image_node_id]["images"]
