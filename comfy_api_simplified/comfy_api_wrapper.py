@@ -4,14 +4,18 @@ import uuid
 import logging
 import websockets
 import asyncio
+import os
 from requests.auth import HTTPBasicAuth
 from requests.compat import urljoin, urlencode
 from comfy_api_simplified.comfy_workflow_wrapper import ComfyWorkflowWrapper
 
 _log = logging.getLogger(__name__)
 
+
 class ComfyApiWrapper:
-    def __init__(self, url: str = "http://127.0.0.1:8188", user: str = "", password: str = ""):
+    def __init__(
+        self, url: str = "http://127.0.0.1:8188", user: str = "", password: str = ""
+    ):
         """
         Initializes the ComfyApiWrapper object.
 
@@ -60,7 +64,9 @@ class ComfyApiWrapper:
         if resp.status_code == 200:
             return resp.json()
         else:
-            raise Exception(f"Request failed with status code {resp.status_code}: {resp.reason}")
+            raise Exception(
+                f"Request failed with status code {resp.status_code}: {resp.reason}"
+            )
 
     async def queue_prompt_and_wait(self, prompt: dict) -> str:
         """
@@ -102,7 +108,9 @@ class ComfyApiWrapper:
                         if data["node"] is None and data["prompt_id"] == prompt_id:
                             return prompt_id
 
-    def queue_and_wait_images(self, prompt: ComfyWorkflowWrapper, output_node_title: str) -> dict:
+    def queue_and_wait_images(
+        self, prompt: ComfyWorkflowWrapper, output_node_title: str
+    ) -> dict:
         """
         Queues a prompt with a ComfyWorkflowWrapper object and waits for the images to be generated.
 
@@ -117,7 +125,7 @@ class ComfyApiWrapper:
             Exception: If the request fails with a non-200 status code.
         """
 
-        loop = asyncio.get_event_loop() 
+        loop = asyncio.get_event_loop()
         prompt_id = loop.run_until_complete(self.queue_prompt_and_wait(prompt))
         history = self.get_history(prompt_id)
         image_node_id = prompt.get_node_id(output_node_title)
@@ -148,7 +156,9 @@ class ComfyApiWrapper:
         if resp.status_code == 200:
             return resp.json()
         else:
-            raise Exception(f"Request failed with status code {resp.status_code}: {resp.reason}")
+            raise Exception(
+                f"Request failed with status code {resp.status_code}: {resp.reason}"
+            )
 
     def get_image(self, filename: str, subfolder: str, folder_type: str) -> bytes:
         """
@@ -173,9 +183,13 @@ class ComfyApiWrapper:
         if resp.status_code == 200:
             return resp.content
         else:
-            raise Exception(f"Request failed with status code {resp.status_code}: {resp.reason}")
+            raise Exception(
+                f"Request failed with status code {resp.status_code}: {resp.reason}"
+            )
 
-    def upload_image(self, filename: str, subfolder: str = "default_upload_folder") -> dict:
+    def upload_image(
+        self, filename: str, subfolder: str = "default_upload_folder"
+    ) -> dict:
         """
         Uploads an image to the Comfy API server.
 
@@ -190,7 +204,7 @@ class ComfyApiWrapper:
             Exception: If the request fails with a non-200 status code.
         """
         url = urljoin(self.url, "/upload/image")
-        serv_file = filename.split("/")[-1]
+        serv_file = os.path.basename(filename)
         data = {"subfolder": subfolder}
         files = {"image": (serv_file, open(filename, "rb"))}
         _log.info(f"Posting {filename} to {url} with data {data}")
@@ -199,4 +213,6 @@ class ComfyApiWrapper:
         if resp.status_code == 200:
             return resp.json()
         else:
-            raise Exception(f"Request failed with status code {resp.status_code}: {resp.reason}")
+            raise Exception(
+                f"Request failed with status code {resp.status_code}: {resp.reason}"
+            )
