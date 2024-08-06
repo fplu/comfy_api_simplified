@@ -178,6 +178,19 @@ class ComfyApiWrapper:
                 f"Request failed with status code {resp.status_code}: {resp.reason}"
             )
 
+    def get_queue_size(self) -> int:
+        """
+        Retrieves the number of prompt in the queue.
+
+        Returns:
+            int: The number of prompt in the queue.
+
+        Raises:
+            Exception: If the request fails with a non-200 status code.
+        """
+        resp = self.get_queue()
+        return len(resp["queue_running"]) + len(resp["queue_pending"])
+
     def get_queue_size_before(self, prompt_id: str) -> int:
         """
         Retrieves the number of prompt in the queue before a prompt.
