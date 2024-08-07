@@ -9,7 +9,7 @@ from requests.compat import urljoin, urlencode
 from comfy_api_simplified.comfy_workflow_wrapper import ComfyWorkflowWrapper
 import os
 import io
-from typing import Callable
+from typing import AsyncGenerator, Any
 
 _log = logging.getLogger(__name__)
 
@@ -74,13 +74,20 @@ class ComfyApiWrapper:
         async for _ in self.wait_prompt_generator(prompt_id, client_id):
             pass
 
-    async def wait_prompt_generator(self, prompt_id: str, client_id: str):
+    async def wait_prompt_generator(
+        self, prompt_id: str, client_id: str
+    ) -> AsyncGenerator[dict, Any]:
         """
-        Wait for a prompt for execution.
+        Wait for a prompt to execute.
+        Generate intermediate results based on the prompt's state.
+        Once the generator ends, the prompt has been executed.
 
         Args:
             prompt_id (dict): The prompt to wait.
             client_id (str): The client ID for the prompt.
+
+        Yields:
+            dict: The intermediate response JSON object.
 
         Raises:
             Exception: If an execution error occurs.
